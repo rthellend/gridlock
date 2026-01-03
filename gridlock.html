@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!--
+ Copyright 2026 Robin Thellend <rthellend@gmail.com>
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -104,10 +119,13 @@
             position: absolute;
             display: grid;
             gap: var(--gap-size);
-            cursor: grab;
-            pointer-events: auto;
-            touch-action: none;
-            transition: transform 0.1s;
+            
+            /* INTERACTION FIX: Clicks pass through empty container space */
+            pointer-events: none; 
+            
+            transition: transform 0.1s linear; 
+            transform-origin: center center;
+            
             filter: 
                 drop-shadow(1px 0 0 #444) 
                 drop-shadow(-1px 0 0 #444) 
@@ -116,16 +134,24 @@
                 drop-shadow(3px 5px 8px rgba(0,0,0,0.5));
         }
 
-        .piece:active {
-            cursor: grabbing;
-            transform: scale(1.05);
+        .piece.dragging {
             z-index: 1000;
+        }
+        .piece.dragging .piece-cell {
+            transform: scale(1.05);
+            cursor: grabbing;
         }
 
         .piece-cell {
             width: var(--cell-size);
             height: var(--cell-size);
             background-color: #ffeeb0; 
+            
+            /* Tiles catch events */
+            pointer-events: auto;
+            cursor: grab;
+            touch-action: none;
+
             box-shadow: inset 2px 2px 4px rgba(255,255,255,0.7), 
                         inset -2px -2px 4px rgba(0,0,0,0.1);
             border: 1px solid #cbb26a; 
@@ -133,6 +159,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            transition: transform 0.1s;
         }
 
         /* --- SYMBOLS --- */
@@ -141,6 +168,11 @@
             filter: grayscale(30%);
         }
         
+        /* Pass clicks on symbols through to the cell */
+        .piece-cell .sym-0, .piece-cell .sym-1, .piece-cell .sym-2 {
+            pointer-events: none;
+        }
+
         .sym-0 { width: 50%; height: 50%; background: #2980b9; } 
         .sym-1 { width: 60%; height: 60%; background: #c0392b; border-radius: 50%; } 
         .sym-2 { position: relative; width: 60%; height: 60%; } 
@@ -181,13 +213,8 @@
 <script>
     // --- DATA ---
     const BOARD_LAYOUT = [
-        [0, 2, 1, 1],
-        [1, 0, 0, 2],
-        [2, 2, 1, 2],
-        [2, 0, 1, 0],
-        [2, 0, 2, 2],
-        [1, 0, 1, 1],
-        [1, 1, 0, 0],
+        [0, 2, 1, 1], [1, 0, 0, 2], [2, 2, 1, 2], [2, 0, 1, 0],
+        [2, 0, 2, 2], [1, 0, 1, 1], [1, 1, 0, 0]
     ];
 
     const PIECES_DEFS = {
@@ -257,15 +284,13 @@
         { id: 47, code: "AAAABCCDEEFIM" },
         { id: 48, code: "AAAABBBCCCFGJ" },
         { id: 49, code: "AAAABBBCCDEEFF" },
-        { id: 50, code: "BBBDDEFFKLMN" },
+        { id: 50, code: "BBBDDEFFKLMN" }
     ];
 
     // --- CONFIG ---
     let cell_size = 50;
     const GAP = 2; 
     const BORDER = 4;
-    
-    // Game State
     let piecesState = [];
 
     function init() {
@@ -292,18 +317,14 @@
             opt.innerText = `Puzzle ${lvl.id}`;
             select.appendChild(opt);
         });
-
-        select.addEventListener('change', (e) => {
-            loadLevel(parseInt(e.target.value));
-        });
+        select.addEventListener('change', (e) => loadLevel(parseInt(e.target.value)));
     }
 
     function loadLevel(index) {
         const layer = document.getElementById('piece-layer');
         layer.innerHTML = '';
         piecesState.length = 0; 
-        const levelCode = LEVELS[index].code;
-        createPieces(levelCode);
+        createPieces(LEVELS[index].code);
     }
 
     function resize() {
@@ -332,30 +353,50 @@
         const layer = document.getElementById('piece-layer');
         const list = codeStr.split('');
         const trayZone = document.getElementById('tray-zone').getBoundingClientRect();
+        
+        // Boundaries
         const winW = window.innerWidth;
         const winH = window.innerHeight;
 
         list.forEach((char, i) => {
             const def = PIECES_DEFS[char];
+            const rot = Math.floor(Math.random() * 4);
             
-            // Randomize position slightly better for small screens
-            // Ensure we don't spawn off the right/bottom edge
-            let posX = trayZone.left + 10 + (Math.random() * (trayZone.width - 60));
-            let posY = trayZone.top + 10 + (Math.random() * (trayZone.height - 60));
+            // Calculate actual width/height for this piece rotation
+            // This ensures we don't spawn it half-off screen
+            const dim = getPieceDimensions(def.type, rot);
+
+            // Random position inside Tray, but constrained by Screen Size
+            let minX = 0;
+            let maxX = winW - dim.w;
+            let minY = 0;
+            let maxY = winH - dim.h;
             
-            // Safety Clamp
-            if (posX > winW - 60) posX = winW - 80;
-            if (posY > winH - 60) posY = winH - 80;
+            // Try to stay in tray if possible
+            let startX = trayZone.left + 10;
+            let rangeX = trayZone.width - 20;
+            let startY = trayZone.top + 10;
+            let rangeY = trayZone.height - 20;
+
+            let posX = startX + (Math.random() * rangeX);
+            let posY = startY + (Math.random() * rangeY);
+
+            // HARD CLAMP to visible area
+            if (posX < minX) posX = minX;
+            if (posX > maxX) posX = maxX;
+            if (posY < minY) posY = minY;
+            if (posY > maxY) posY = maxY;
 
             const p = {
                 id: i,
                 def: def,
-                rot: Math.floor(Math.random() * 4), // Random starting rotation
+                rot: rot, 
                 x: posX,
                 y: posY, 
                 placed: false,
                 gridPos: null,
-                el: document.createElement('div')
+                el: document.createElement('div'),
+                isAnimating: false 
             };
 
             p.el.className = 'piece';
@@ -364,6 +405,20 @@
             layer.appendChild(p.el);
             renderPiece(p);
         });
+    }
+
+    function getPieceDimensions(type, rot) {
+        // Calculate dimensions in pixels
+        const coords = getCoords(type, rot);
+        const maxR = Math.max(...coords.map(c => c.r));
+        const maxC = Math.max(...coords.map(c => c.c));
+        const cols = maxC + 1;
+        const rows = maxR + 1;
+        
+        return {
+            w: (cols * cell_size) + ((cols - 1) * GAP),
+            h: (rows * cell_size) + ((rows - 1) * GAP)
+        };
     }
 
     function renderPiece(p) {
@@ -405,7 +460,6 @@
         for(let i=0; i<rot; i++) {
             pts = pts.map(p => ({r: p.c, c: -p.r}));
         }
-
         const minR = Math.min(...pts.map(p => p.r));
         const minC = Math.min(...pts.map(p => p.c));
         return pts.map(p => ({r: p.r - minR, c: p.c - minC}));
@@ -418,6 +472,8 @@
 
         const onDown = (e) => {
             e.preventDefault();
+            if(p.isAnimating) return;
+
             dragging = false;
             startTime = Date.now();
             
@@ -426,8 +482,8 @@
             startY = touch.clientY;
             startLeft = p.x;
             startTop = p.y;
-
-            p.el.style.zIndex = 2000;
+            
+            p.el.classList.add('dragging');
 
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
@@ -461,7 +517,8 @@
             document.removeEventListener('mouseup', onUp);
             document.removeEventListener('touchmove', onMove);
             document.removeEventListener('touchend', onUp);
-            p.el.style.zIndex = "";
+            
+            p.el.classList.remove('dragging');
 
             if (!dragging && (Date.now() - startTime < 300)) {
                 handleTap(p);
@@ -480,12 +537,41 @@
             p.gridPos = null;
             moveToTray(p);
         } else {
-            p.rot = (p.rot + 1) % 4;
-            renderPiece(p);
+            rotatePieceAnimate(p);
         }
     }
 
-    // --- SNAP FIX: Tolerance & Gap Logic ---
+    function rotatePieceAnimate(p) {
+        if (p.isAnimating) return;
+        p.isAnimating = true;
+
+        const w = parseFloat(p.el.style.width);
+        const h = parseFloat(p.el.style.height);
+        const cx = p.x + w / 2;
+        const cy = p.y + h / 2;
+
+        p.el.style.transition = 'transform 0.2s ease-out';
+        p.el.style.transform = 'rotate(90deg) scale(1.1)'; 
+
+        setTimeout(() => {
+            p.rot = (p.rot + 1) % 4;
+            p.el.style.transition = 'none';
+            p.el.style.transform = 'none';
+            renderPiece(p);
+
+            const newW = parseFloat(p.el.style.width);
+            const newH = parseFloat(p.el.style.height);
+            p.x = cx - newW / 2;
+            p.y = cy - newH / 2;
+            p.el.style.left = p.x + 'px';
+            p.el.style.top = p.y + 'px';
+
+            void p.el.offsetWidth; 
+            p.el.style.transition = ''; 
+            p.isAnimating = false;
+        }, 200);
+    }
+
     function handleDrop(p) {
         const board = document.getElementById('board');
         const bRect = board.getBoundingClientRect();
@@ -497,19 +583,21 @@
         if (pCenterX > bRect.left && pCenterX < bRect.right && 
             pCenterY > bRect.top && pCenterY < bRect.bottom) {
             
-            // Calculate relative offset (ignoring gap for rough estimate)
             const relX = pRect.left - (bRect.left + BORDER);
             const relY = pRect.top - (bRect.top + BORDER);
             const step = cell_size + GAP;
             
-            // Rough Grid Position
+            // 1. Primary Snap
             const centerC = Math.round(relX / step);
             const centerR = Math.round(relY / step);
+            
+            if (isValid(p, centerR, centerC)) {
+                snapTo(p, centerR, centerC);
+                return;
+            }
 
-            // NEIGHBOR SEARCH (Tolerance)
-            // We check the "rough" center and its neighbors.
+            // 2. Tolerance Snap
             const candidates = [
-                {r: centerR, c: centerC},
                 {r: centerR+1, c: centerC},
                 {r: centerR-1, c: centerC},
                 {r: centerR, c: centerC+1},
@@ -520,17 +608,12 @@
             let minDistance = Infinity;
 
             for (let cand of candidates) {
-                // 1. Is it valid?
                 if (isValid(p, cand.r, cand.c)) {
-                    
-                    // 2. Calculate pixel position of this candidate
                     const candX = cand.c * step;
                     const candY = cand.r * step;
-                    
-                    // 3. Distance from actual drop
                     const dist = Math.hypot(relX - candX, relY - candY);
 
-                    // 4. "Magnetic" Radius (60% of a cell size)
+                    // Allow snap if within 30px
                     if (dist < cell_size * 0.6) {
                         if (dist < minDistance) {
                             minDistance = dist;
@@ -541,14 +624,18 @@
             }
 
             if (bestMatch) {
-                p.placed = true;
-                p.gridPos = bestMatch;
-                snapToGrid(p);
-                renderPiece(p);
-                checkWin();
+                snapTo(p, bestMatch.r, bestMatch.c);
                 return;
             }
         }
+    }
+
+    function snapTo(p, r, c) {
+        p.placed = true;
+        p.gridPos = {r: r, c: c};
+        snapToGrid(p);
+        renderPiece(p);
+        checkWin();
     }
 
     function snapToGrid(p) {
@@ -562,14 +649,22 @@
 
     function moveToTray(p) {
         const trayZone = document.getElementById('tray-zone').getBoundingClientRect();
-        // Keep inside bounds
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        
+        // Use current dimensions to ensure safe reset
+        const dim = getPieceDimensions(p.def.type, p.rot);
+        const maxX = winW - dim.w;
+        const maxY = winH - dim.h;
+        
+        // Random placement with clamp
         let tx = trayZone.left + 20 + Math.random() * (trayZone.width - 60);
         let ty = trayZone.top + 20 + Math.random() * (trayZone.height - 60);
         
-        const winW = window.innerWidth;
-        const winH = window.innerHeight;
-        if (tx > winW - 80) tx = winW - 80;
-        if (ty > winH - 80) ty = winH - 80;
+        if (tx > maxX) tx = maxX;
+        if (tx < 0) tx = 0;
+        if (ty > maxY) ty = maxY;
+        if (ty < 0) ty = 0;
 
         p.x = tx;
         p.y = ty;
@@ -577,13 +672,18 @@
     }
 
     function ensureInBounds(p) {
+        // Called on resize to keep pieces valid
         const winW = window.innerWidth;
         const winH = window.innerHeight;
-        // Simple clamp
-        if (p.x < 0) p.x = 10;
-        if (p.y < 0) p.y = 10;
-        if (p.x > winW - 50) p.x = winW - 60;
-        if (p.y > winH - 50) p.y = winH - 60;
+        const dim = getPieceDimensions(p.def.type, p.rot);
+        
+        const maxX = winW - dim.w;
+        const maxY = winH - dim.h;
+        
+        if (p.x < 0) p.x = 0;
+        if (p.y < 0) p.y = 0;
+        if (p.x > maxX) p.x = maxX;
+        if (p.y > maxY) p.y = maxY;
     }
 
     function isValid(p, r, c) {
