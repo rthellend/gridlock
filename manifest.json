@@ -1,0 +1,16 @@
+{
+  "name": "Gridlock",
+  "short_name": "Gridlock",
+  "description": "A browser-based logic puzzle game.",
+  "start_url": "gridlock.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "gridlock.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    }
+  ]
+}
