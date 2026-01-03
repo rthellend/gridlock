@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gridlock</title>
+    <style>
+        :root {
+            --cell-size: 50px;
+            --gap-size: 2px; 
+            --bg-color: #f0f2f5;
+            --board-bg: #2c3e50;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        /* --- HEADER --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 50;
+            flex: 0 0 auto;
+        }
+        
+        .header-title h1 { margin: 0; font-size: 1.2rem; color: #333; }
+        .header-title p { margin: 2px 0 0; font-size: 0.8rem; color: #666; }
+
+        .controls select {
+            padding: 5px 10px;
+            font-size: 1rem;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+
+        /* --- LAYOUT --- */
+        #game-layout {
+            flex: 1;
+            display: flex;
+            flex-direction: row; 
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        #board-zone {
+            flex: 0 0 auto;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #dcdcdc;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(4, var(--cell-size));
+            grid-template-rows: repeat(7, var(--cell-size));
+            gap: var(--gap-size);
+            background-color: var(--board-bg);
+            border: 4px solid var(--board-bg);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+
+        .board-cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: #ffffff; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #tray-zone {
+            flex: 1;
+            background-color: #e0e0e0;
+            box-shadow: inset 10px 0 20px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        #piece-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100; pointer-events: none;
+        }
+
+        /* --- PIECE VISUALS --- */
+        .piece {
+            position: absolute;
+            display: grid;
+            gap: var(--gap-size);
+            cursor: grab;
+            pointer-events: auto;
+            touch-action: none;
+            transition: transform 0.1s;
+            filter: 
+                drop-shadow(1px 0 0 #444) 
+                drop-shadow(-1px 0 0 #444) 
+                drop-shadow(0 1px 0 #444) 
+                drop-shadow(0 -1px 0 #444)
+                drop-shadow(3px 5px 8px rgba(0,0,0,0.5));
+        }
+
+        .piece:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+            z-index: 1000;
+        }
+
+        .piece-cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: #ffeeb0; 
+            box-shadow: inset 2px 2px 4px rgba(255,255,255,0.7), 
+                        inset -2px -2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #cbb26a; 
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- SYMBOLS --- */
+        .board-cell .sym-0, .board-cell .sym-1, .board-cell .sym-2 { 
+            opacity: 0.15; 
+            filter: grayscale(30%);
+        }
+        
+        .sym-0 { width: 50%; height: 50%; background: #2980b9; } 
+        .sym-1 { width: 60%; height: 60%; background: #c0392b; border-radius: 50%; } 
+        .sym-2 { position: relative; width: 60%; height: 60%; } 
+        .sym-2::before, .sym-2::after { content:''; position: absolute; background: #27ae60; }
+        .sym-2::before { left: 40%; top: 0; width: 20%; height: 100%; }
+        .sym-2::after { left: 0; top: 40%; width: 100%; height: 20%; }
+
+        @media (max-width: 600px) {
+            #game-layout { flex-direction: column; }
+            #board-zone { padding: 10px; }
+            #tray-zone { border-top: 2px solid #ccc; }
+            header { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-title">
+        <h1>Gridlock</h1>
+        <p>Drag to move • Tap to rotate</p>
+    </div>
+    <div class="controls">
+        <select id="level-select">
+            </select>
+    </div>
+</header>
+
+<div id="game-layout">
+    <div id="board-zone">
+        <div id="board"></div>
+    </div>
+    <div id="tray-zone"></div>
+</div>
+
+<div id="piece-layer"></div>
+
+<script>
+    // --- DATA ---
+    const BOARD_LAYOUT = [
+        [0, 2, 1, 1],
+        [1, 0, 0, 2],
+        [2, 2, 1, 2],
+        [2, 0, 1, 0],
+        [2, 0, 2, 2],
+        [1, 0, 1, 1],
+        [1, 1, 0, 0],
+    ];
+
+    const PIECES_DEFS = {
+        A: { type: 'pair', syms: [1, 2] },
+        B: { type: 'pair', syms: [0, 2] },
+        C: { type: 'pair', syms: [0, 1] },
+        D: { type: 'pair', syms: [2, 2] },
+        E: { type: 'pair', syms: [0, 0] },
+        F: { type: 'pair', syms: [1, 1] },
+        G: { type: 'L', syms: [1, 0, 0] }, 
+        H: { type: 'L', syms: [1, 2, 0] },
+        I: { type: 'L', syms: [0, 1, 2] },
+        J: { type: 'L', syms: [2, 2, 0] },
+        K: { type: 'L', syms: [1, 1, 0] },
+        L: { type: 'L', syms: [0, 1, 1] },
+        M: { type: 'L', syms: [0, 2, 1] },
+        N: { type: 'L', syms: [2, 0, 1] },
+    };
+
+    const LEVELS = [
+        { id: 1, code: "AABCDDEFGIKN" },
+        { id: 2, code: "ABCDDEFFGJKM" },
+        { id: 3, code: "ABCCDEFFIJMN" },
+        { id: 4, code: "ABDDEEFFIKMN" },
+        { id: 5, code: "ABBCDEFFIJKM" },
+        { id: 6, code: "ABBCCCDFIJKM" },
+        { id: 7, code: "ABBCCCDDEFFKJ" },
+        { id: 8, code: "ABBCCCDDHKLN" },
+        { id: 9, code: "ABBBCCDDEFFHL" },
+        { id: 10, code: "ABBBCCDDEFFLN" },
+        { id: 11, code: "ABBBCCCDDFFGI" },
+        { id: 12, code: "AABCDEFFGIJM" },
+        { id: 13, code: "AABCDDEFGKNM" },
+        { id: 14, code: "AABCDEFFGHIJ" },
+        { id: 15, code: "AABCDEFFGJMN" },
+        { id: 16, code: "AABCCDEFIJKM" },
+        { id: 17, code: "AABCCDDEEFFHN" },
+        { id: 18, code: "AABCCCDDGHIL" },
+        { id: 19, code: "AABBCCDFGIJK" },
+        { id: 20, code: "AABBCCDFGJLN" },
+        { id: 21, code: "AABBCCCDEFFIJ" },
+        { id: 22, code: "AABBCCCDEFFJN" },
+        { id: 23, code: "AABBCCCDJKLM" },
+        { id: 24, code: "AABBCCCDDEFHK" },
+        { id: 25, code: "AABBCCCDEFFIJ" },
+        { id: 26, code: "AABBFGIJKMN" },
+        { id: 27, code: "AABBBCFFGJMN" },
+        { id: 28, code: "AABBBCCCDDFGL" },
+        { id: 29, code: "AAABCCDEEFFIJ" },
+        { id: 30, code: "AAABCCDEEFFHJ" },
+        { id: 31, code: "AAABCDDEEFFGN" },
+        { id: 32, code: "AAABCCDDEEFKM" },
+        { id: 33, code: "АААBBCEFJKMN" },
+        { id: 34, code: "AAABBEFFGJMN" },
+        { id: 35, code: "AAABBBCCCDFGH" },
+        { id: 36, code: "AAABBBCCEFFIJ" },
+        { id: 37, code: "AAABCDEFGIMN" },
+        { id: 38, code: "AAABCCDDEEFHL" },
+        { id: 39, code: "AAABCCCDGIJL" },
+        { id: 40, code: "AAABBCEFIJKM" },
+        { id: 41, code: "AAABBCCCDDEEFF" },
+        { id: 42, code: "AAABBCCDGHKM" },
+        { id: 43, code: "AAAABBCCDEFGI" },
+        { id: 44, code: "AAACCCDEIJLN" },
+        { id: 45, code: "AAABBBCCCIJLN" },
+        { id: 46, code: "AAAABCCDEEFHM" },
+        { id: 47, code: "AAAABCCDEEFIM" },
+        { id: 48, code: "AAAABBBCCCFGJ" },
+        { id: 49, code: "AAAABBBCCDEEFF" },
+        { id: 50, code: "BBBDDEFFKLMN" },
+    ];
+
+    // --- CONFIG ---
+    let cell_size = 50;
+    const GAP = 2; 
+    const BORDER = 4;
+    
+    // Game State
+    let piecesState = [];
+
+    function init() {
+        initControls();
+        resize();
+        renderBoard();
+        loadLevel(0);
+        
+        window.addEventListener('resize', () => { 
+            resize(); 
+            piecesState.forEach(p => {
+                if (p.placed) snapToGrid(p);
+                else ensureInBounds(p);
+                renderPiece(p);
+            });
+        });
+    }
+
+    function initControls() {
+        const select = document.getElementById('level-select');
+        LEVELS.forEach((lvl, index) => {
+            const opt = document.createElement('option');
+            opt.value = index;
+            opt.innerText = `Puzzle ${lvl.id}`;
+            select.appendChild(opt);
+        });
+
+        select.addEventListener('change', (e) => {
+            loadLevel(parseInt(e.target.value));
+        });
+    }
+
+    function loadLevel(index) {
+        const layer = document.getElementById('piece-layer');
+        layer.innerHTML = '';
+        piecesState.length = 0; 
+        const levelCode = LEVELS[index].code;
+        createPieces(levelCode);
+    }
+
+    function resize() {
+        const h = window.innerHeight - 80; 
+        const w = window.innerWidth;
+        const hSize = Math.floor(h / 8); 
+        const wSize = Math.floor((w > 600 ? w * 0.45 : w - 40) / 4);
+        cell_size = Math.min(60, Math.min(hSize, wSize));
+        document.documentElement.style.setProperty('--cell-size', cell_size + 'px');
+    }
+
+    function renderBoard() {
+        const board = document.getElementById('board');
+        board.innerHTML = '';
+        BOARD_LAYOUT.forEach((row, r) => {
+            row.forEach((sym, c) => {
+                const cell = document.createElement('div');
+                cell.className = 'board-cell';
+                cell.innerHTML = `<div class="sym-${sym}"></div>`;
+                board.appendChild(cell);
+            });
+        });
+    }
+
+    function createPieces(codeStr) {
+        const layer = document.getElementById('piece-layer');
+        const list = codeStr.split('');
+        const trayZone = document.getElementById('tray-zone').getBoundingClientRect();
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+
+        list.forEach((char, i) => {
+            const def = PIECES_DEFS[char];
+            
+            // Randomize position slightly better for small screens
+            // Ensure we don't spawn off the right/bottom edge
+            let posX = trayZone.left + 10 + (Math.random() * (trayZone.width - 60));
+            let posY = trayZone.top + 10 + (Math.random() * (trayZone.height - 60));
+            
+            // Safety Clamp
+            if (posX > winW - 60) posX = winW - 80;
+            if (posY > winH - 60) posY = winH - 80;
+
+            const p = {
+                id: i,
+                def: def,
+                rot: Math.floor(Math.random() * 4), // Random starting rotation
+                x: posX,
+                y: posY, 
+                placed: false,
+                gridPos: null,
+                el: document.createElement('div')
+            };
+
+            p.el.className = 'piece';
+            addInteraction(p);
+            piecesState.push(p);
+            layer.appendChild(p.el);
+            renderPiece(p);
+        });
+    }
+
+    function renderPiece(p) {
+        const coords = getCoords(p.def.type, p.rot);
+        const maxR = Math.max(...coords.map(c => c.r));
+        const maxC = Math.max(...coords.map(c => c.c));
+        const cols = maxC + 1;
+        const rows = maxR + 1;
+
+        p.el.style.gridTemplateRows = `repeat(${rows}, var(--cell-size))`;
+        p.el.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
+        
+        const width = (cols * cell_size) + ((cols - 1) * GAP);
+        const height = (rows * cell_size) + ((rows - 1) * GAP);
+        
+        p.el.style.width = width + 'px';
+        p.el.style.height = height + 'px';
+
+        p.el.innerHTML = '';
+        coords.forEach((pt, idx) => {
+            const div = document.createElement('div');
+            div.className = 'piece-cell';
+            div.style.gridRow = pt.r + 1;
+            div.style.gridColumn = pt.c + 1;
+            const sym = p.def.syms[idx]; 
+            div.innerHTML = `<div class="sym-${sym}"></div>`;
+            p.el.appendChild(div);
+        });
+
+        p.el.style.left = p.x + 'px';
+        p.el.style.top = p.y + 'px';
+    }
+
+    function getCoords(type, rot) {
+        let pts = (type === 'pair') 
+            ? [{r:0,c:0}, {r:1,c:0}] 
+            : [{r:0,c:0}, {r:1,c:0}, {r:1,c:1}];
+        
+        for(let i=0; i<rot; i++) {
+            pts = pts.map(p => ({r: p.c, c: -p.r}));
+        }
+
+        const minR = Math.min(...pts.map(p => p.r));
+        const minC = Math.min(...pts.map(p => p.c));
+        return pts.map(p => ({r: p.r - minR, c: p.c - minC}));
+    }
+
+    function addInteraction(p) {
+        let startX, startY, startLeft, startTop;
+        let dragging = false;
+        let startTime;
+
+        const onDown = (e) => {
+            e.preventDefault();
+            dragging = false;
+            startTime = Date.now();
+            
+            const touch = e.touches ? e.touches[0] : e;
+            startX = touch.clientX;
+            startY = touch.clientY;
+            startLeft = p.x;
+            startTop = p.y;
+
+            p.el.style.zIndex = 2000;
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+            document.addEventListener('touchmove', onMove, {passive: false});
+            document.addEventListener('touchend', onUp);
+        };
+
+        const onMove = (e) => {
+            const touch = e.touches ? e.touches[0] : e;
+            const dx = touch.clientX - startX;
+            const dy = touch.clientY - startY;
+
+            if (!dragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+                dragging = true;
+                if(p.placed) {
+                    p.placed = false;
+                    p.gridPos = null;
+                }
+            }
+
+            if (dragging) {
+                p.x = startLeft + dx;
+                p.y = startTop + dy;
+                p.el.style.left = p.x + 'px';
+                p.el.style.top = p.y + 'px';
+            }
+        };
+
+        const onUp = (e) => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onUp);
+            p.el.style.zIndex = "";
+
+            if (!dragging && (Date.now() - startTime < 300)) {
+                handleTap(p);
+            } else {
+                handleDrop(p);
+            }
+        };
+
+        p.el.addEventListener('mousedown', onDown);
+        p.el.addEventListener('touchstart', onDown, {passive: false});
+    }
+
+    function handleTap(p) {
+        if(p.placed) {
+            p.placed = false;
+            p.gridPos = null;
+            moveToTray(p);
+        } else {
+            p.rot = (p.rot + 1) % 4;
+            renderPiece(p);
+        }
+    }
+
+    // --- SNAP FIX: Tolerance & Gap Logic ---
+    function handleDrop(p) {
+        const board = document.getElementById('board');
+        const bRect = board.getBoundingClientRect();
+        const pRect = p.el.getBoundingClientRect();
+        
+        const pCenterX = pRect.left + pRect.width / 2;
+        const pCenterY = pRect.top + pRect.height / 2;
+
+        if (pCenterX > bRect.left && pCenterX < bRect.right && 
+            pCenterY > bRect.top && pCenterY < bRect.bottom) {
+            
+            // Calculate relative offset (ignoring gap for rough estimate)
+            const relX = pRect.left - (bRect.left + BORDER);
+            const relY = pRect.top - (bRect.top + BORDER);
+            const step = cell_size + GAP;
+            
+            // Rough Grid Position
+            const centerC = Math.round(relX / step);
+            const centerR = Math.round(relY / step);
+
+            // NEIGHBOR SEARCH (Tolerance)
+            // We check the "rough" center and its neighbors.
+            const candidates = [
+                {r: centerR, c: centerC},
+                {r: centerR+1, c: centerC},
+                {r: centerR-1, c: centerC},
+                {r: centerR, c: centerC+1},
+                {r: centerR, c: centerC-1}
+            ];
+
+            let bestMatch = null;
+            let minDistance = Infinity;
+
+            for (let cand of candidates) {
+                // 1. Is it valid?
+                if (isValid(p, cand.r, cand.c)) {
+                    
+                    // 2. Calculate pixel position of this candidate
+                    const candX = cand.c * step;
+                    const candY = cand.r * step;
+                    
+                    // 3. Distance from actual drop
+                    const dist = Math.hypot(relX - candX, relY - candY);
+
+                    // 4. "Magnetic" Radius (60% of a cell size)
+                    if (dist < cell_size * 0.6) {
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            bestMatch = cand;
+                        }
+                    }
+                }
+            }
+
+            if (bestMatch) {
+                p.placed = true;
+                p.gridPos = bestMatch;
+                snapToGrid(p);
+                renderPiece(p);
+                checkWin();
+                return;
+            }
+        }
+    }
+
+    function snapToGrid(p) {
+        if (!p.placed) return;
+        const board = document.getElementById('board');
+        const bRect = board.getBoundingClientRect();
+        const step = cell_size + GAP;
+        p.x = bRect.left + BORDER + (p.gridPos.c * step);
+        p.y = bRect.top + BORDER + (p.gridPos.r * step);
+    }
+
+    function moveToTray(p) {
+        const trayZone = document.getElementById('tray-zone').getBoundingClientRect();
+        // Keep inside bounds
+        let tx = trayZone.left + 20 + Math.random() * (trayZone.width - 60);
+        let ty = trayZone.top + 20 + Math.random() * (trayZone.height - 60);
+        
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        if (tx > winW - 80) tx = winW - 80;
+        if (ty > winH - 80) ty = winH - 80;
+
+        p.x = tx;
+        p.y = ty;
+        renderPiece(p);
+    }
+
+    function ensureInBounds(p) {
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        // Simple clamp
+        if (p.x < 0) p.x = 10;
+        if (p.y < 0) p.y = 10;
+        if (p.x > winW - 50) p.x = winW - 60;
+        if (p.y > winH - 50) p.y = winH - 60;
+    }
+
+    function isValid(p, r, c) {
+        const coords = getCoords(p.def.type, p.rot);
+        for (let i=0; i<coords.length; i++) {
+            const pt = coords[i];
+            const tr = r + pt.r;
+            const tc = c + pt.c;
+
+            if (tr < 0 || tr >= 7 || tc < 0 || tc >= 4) return false;
+            if (piecesState.some(o => o !== p && o.placed && checkOverlap(o, tr, tc))) return false;
+            if (BOARD_LAYOUT[tr][tc] !== p.def.syms[i]) return false;
+        }
+        return true;
+    }
+
+    function checkOverlap(other, tr, tc) {
+        const coords = getCoords(other.def.type, other.rot);
+        return coords.some(pt => (other.gridPos.r + pt.r) === tr && (other.gridPos.c + pt.c) === tc);
+    }
+
+    function checkWin() {
+        if (piecesState.every(p => p.placed)) {
+            setTimeout(() => alert("Puzzle Solved!"), 100);
+        }
+    }
+
+    init();
+
+</script>
+</body>
+</html>
