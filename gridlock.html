@@ -133,12 +133,17 @@
                 drop-shadow(0 -1px 0 #444)
                 drop-shadow(3px 5px 8px rgba(0,0,0,0.5));
             transform-origin: center center;
+            z-index: 20;
         }
 
         .piece:active {
             cursor: grabbing;
             transform: scale(1.05);
             z-index: 1000;
+        }
+
+        .piece.placed {
+            z-index: 15;
         }
 
         .piece-cell {
@@ -468,6 +473,7 @@
 
         p.el.style.gridTemplateRows = `repeat(${rows}, var(--cell-size))`;
         p.el.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
+        p.el.classList.toggle('placed', p.placed);
         
         const width = (cols * cell_size) + ((cols - 1) * GAP);
         const height = (rows * cell_size) + ((rows - 1) * GAP);
@@ -571,12 +577,7 @@
     }
 
     function handleTap(p) {
-        if(p.placed) {
-            p.placed = false;
-            p.gridPos = null;
-            placePieceRandomly(p); // Return to scatter
-            renderPiece(p);
-        } else {
+        if(!p.placed) {
             rotatePieceAnimate(p);
         }
     }
