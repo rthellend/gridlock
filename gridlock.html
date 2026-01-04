@@ -24,7 +24,7 @@
     <style>
         :root {
             --cell-size: 50px;
-            --gap-size: 2px; 
+            --gap-size: 2px;
             --bg-color: #f0f2f5;
             --board-bg: #2c3e50;
         }
@@ -52,7 +52,7 @@
             z-index: 50;
             flex: 0 0 auto;
         }
-        
+
         .header-title h1 { margin: 0; font-size: 1.2rem; color: #333; }
         .header-title p { margin: 2px 0 0; font-size: 0.8rem; color: #666; }
 
@@ -100,7 +100,7 @@
         .board-cell {
             width: var(--cell-size);
             height: var(--cell-size);
-            background-color: #ffffff; 
+            background-color: #ffffff;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -126,10 +126,10 @@
             pointer-events: none; /* Clicks pass through empty container space */
             touch-action: none;
             transition: transform 0.1s;
-            filter: 
-                drop-shadow(1px 0 0 #444) 
-                drop-shadow(-1px 0 0 #444) 
-                drop-shadow(0 1px 0 #444) 
+            filter:
+                drop-shadow(1px 0 0 #444)
+                drop-shadow(-1px 0 0 #444)
+                drop-shadow(0 1px 0 #444)
                 drop-shadow(0 -1px 0 #444)
                 drop-shadow(3px 5px 8px rgba(0,0,0,0.5));
             transform-origin: center center;
@@ -149,11 +149,11 @@
         .piece-cell {
             width: var(--cell-size);
             height: var(--cell-size);
-            background-color: #ffeeb0; 
+            background-color: #ffeeb0;
             pointer-events: auto; /* Restore events on tiles */
-            box-shadow: inset 2px 2px 4px rgba(255,255,255,0.7), 
+            box-shadow: inset 2px 2px 4px rgba(255,255,255,0.7),
                         inset -2px -2px 4px rgba(0,0,0,0.1);
-            border: 1px solid #cbb26a; 
+            border: 1px solid #cbb26a;
             box-sizing: border-box;
             display: flex;
             justify-content: center;
@@ -161,14 +161,14 @@
         }
 
         /* --- SYMBOLS --- */
-        .board-cell .sym-0, .board-cell .sym-1, .board-cell .sym-2 { 
-            opacity: 0.15; 
+        .board-cell .sym-0, .board-cell .sym-1, .board-cell .sym-2 {
+            opacity: 0.15;
             filter: grayscale(30%);
         }
-        
-        .sym-0 { width: 50%; height: 50%; background: #2980b9; } 
-        .sym-1 { width: 60%; height: 60%; background: #c0392b; border-radius: 50%; } 
-        .sym-2 { position: relative; width: 60%; height: 60%; } 
+
+        .sym-0 { width: 50%; height: 50%; background: #2980b9; }
+        .sym-1 { width: 60%; height: 60%; background: #c0392b; border-radius: 50%; }
+        .sym-2 { position: relative; width: 60%; height: 60%; }
         .sym-2::before, .sym-2::after { content:''; position: absolute; background: #27ae60; }
         .sym-2::before { left: 40%; top: 0; width: 20%; height: 100%; }
         .sym-2::after { left: 0; top: 40%; width: 100%; height: 20%; }
@@ -216,20 +216,20 @@
     ];
 
     const PIECES_DEFS = {
-        A: { type: 'pair', syms: [1, 2] },
-        B: { type: 'pair', syms: [0, 2] },
-        C: { type: 'pair', syms: [0, 1] },
-        D: { type: 'pair', syms: [2, 2] },
-        E: { type: 'pair', syms: [0, 0] },
-        F: { type: 'pair', syms: [1, 1] },
-        G: { type: 'L', syms: [1, 0, 0] }, 
-        H: { type: 'L', syms: [1, 2, 0] },
-        I: { type: 'L', syms: [0, 1, 2] },
-        J: { type: 'L', syms: [2, 2, 0] },
-        K: { type: 'L', syms: [1, 1, 0] },
-        L: { type: 'L', syms: [0, 1, 1] },
-        M: { type: 'L', syms: [0, 2, 1] },
-        N: { type: 'L', syms: [2, 0, 1] },
+        A: [1, 2],
+        B: [0, 2],
+        C: [0, 1],
+        D: [2, 2],
+        E: [0, 0],
+        F: [1, 1],
+        G: [1, 0, 0],
+        H: [1, 2, 0],
+        I: [0, 1, 2],
+        J: [2, 2, 0],
+        K: [1, 1, 0],
+        L: [0, 1, 1],
+        M: [0, 2, 1],
+        N: [2, 0, 1],
     };
 
     const LEVELS = [
@@ -287,9 +287,9 @@
 
     // --- CONFIG ---
     let cell_size = 50;
-    const GAP = 2; 
+    const GAP = 2;
     const BORDER = 4;
-    
+
     // Game State
     let piecesState = [];
 
@@ -298,9 +298,9 @@
         resize();
         renderBoard();
         loadLevel(0);
-        
-        window.addEventListener('resize', () => { 
-            resize(); 
+
+        window.addEventListener('resize', () => {
+            resize();
             piecesState.forEach(p => {
                 if (p.placed) snapToGrid(p);
                 else placePieceRandomly(p);
@@ -326,22 +326,22 @@
     function loadLevel(index) {
         const layer = document.getElementById('piece-layer');
         layer.innerHTML = '';
-        piecesState.length = 0; 
+        piecesState.length = 0;
         const levelCode = LEVELS[index].code;
         createPieces(levelCode);
     }
 
     function resize() {
-        const h = window.innerHeight - 80; 
+        const h = window.innerHeight - 80;
         const w = window.innerWidth;
-        
+
         // Calculate size allowing for margins (~2-3 cells on sides/top/bottom)
-        const hSize = Math.floor(h / 12); 
-        const wSize = Math.floor(w / 8); 
-        
+        const hSize = Math.floor(h / 12);
+        const wSize = Math.floor(w / 8);
+
         cell_size = Math.min(60, Math.min(hSize, wSize));
         // Minimum size cap
-        if (cell_size < 25) cell_size = 25; 
+        if (cell_size < 25) cell_size = 25;
 
         document.documentElement.style.setProperty('--cell-size', cell_size + 'px');
     }
@@ -362,25 +362,25 @@
     function createPieces(codeStr) {
         const layer = document.getElementById('piece-layer');
         const list = codeStr.split('');
-        
+
         list.forEach((char, i) => {
             const def = PIECES_DEFS[char];
             const p = {
                 id: i,
                 def: def,
-                rot: Math.floor(Math.random() * 4), 
-                x: 0, y: 0, 
+                rot: Math.floor(Math.random() * 4),
+                x: 0, y: 0,
                 placed: false,
                 gridPos: null,
                 el: document.createElement('div'),
-                isAnimating: false 
+                isAnimating: false
             };
 
             p.el.className = 'piece';
             addInteraction(p);
             piecesState.push(p);
             layer.appendChild(p.el);
-            
+
             // Initial Random Placement
             placePieceRandomly(p);
             renderPiece(p);
@@ -391,11 +391,11 @@
     function placePieceRandomly(p) {
         const boardEl = document.getElementById('board');
         const bRect = boardEl.getBoundingClientRect();
-        
+
         const winW = window.innerWidth;
         const winH = window.innerHeight;
-        
-        const dims = getPieceDimensions(p.def.type, p.rot);
+
+        const dims = getPieceDimensions(p.def.length, p.rot);
         const pW = dims.w;
         const pH = dims.h;
 
@@ -406,7 +406,7 @@
         for(let i=0; i<50; i++) {
             // Random position in safe area (avoiding extreme edges)
             const rx = 10 + Math.random() * (winW - pW - 20);
-            const ry = 80 + Math.random() * (winH - pH - 90); 
+            const ry = 80 + Math.random() * (winH - pH - 90);
 
             // Proposed Rect
             const pRect = { left: rx, top: ry, right: rx+pW, bottom: ry+pH };
@@ -419,11 +419,11 @@
             for(const other of piecesState) {
                 if(other === p) continue;
                 // Ignore uninitialized pieces
-                if(other.x === 0 && other.y === 0) continue; 
-                
-                const oDims = getPieceDimensions(other.def.type, other.rot);
+                if(other.x === 0 && other.y === 0) continue;
+
+                const oDims = getPieceDimensions(other.def.length, other.rot);
                 const oRect = { left: other.x, top: other.y, right: other.x+oDims.w, bottom: other.y+oDims.h };
-                
+
                 if (rectIntersect(pRect, oRect)) {
                     overlap = true;
                     break;
@@ -446,14 +446,14 @@
     }
 
     function rectIntersect(r1, r2) {
-        return !(r2.left > r1.right || 
-                 r2.right < r1.left || 
-                 r2.top > r1.bottom || 
+        return !(r2.left > r1.right ||
+                 r2.right < r1.left ||
+                 r2.top > r1.bottom ||
                  r2.bottom < r1.top);
     }
-    
-    function getPieceDimensions(type, rot) {
-        const coords = getCoords(type, rot);
+
+    function getPieceDimensions(size, rot) {
+        const coords = getCoords(size, rot);
         const maxR = Math.max(...coords.map(c => c.r));
         const maxC = Math.max(...coords.map(c => c.c));
         const cols = maxC + 1;
@@ -465,7 +465,7 @@
     }
 
     function renderPiece(p) {
-        const coords = getCoords(p.def.type, p.rot);
+        const coords = getCoords(p.def.length, p.rot);
         const maxR = Math.max(...coords.map(c => c.r));
         const maxC = Math.max(...coords.map(c => c.c));
         const cols = maxC + 1;
@@ -474,10 +474,10 @@
         p.el.style.gridTemplateRows = `repeat(${rows}, var(--cell-size))`;
         p.el.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
         p.el.classList.toggle('placed', p.placed);
-        
+
         const width = (cols * cell_size) + ((cols - 1) * GAP);
         const height = (rows * cell_size) + ((rows - 1) * GAP);
-        
+
         p.el.style.width = width + 'px';
         p.el.style.height = height + 'px';
 
@@ -487,7 +487,7 @@
             div.className = 'piece-cell';
             div.style.gridRow = pt.r + 1;
             div.style.gridColumn = pt.c + 1;
-            const sym = p.def.syms[idx]; 
+            const sym = p.def[idx];
             div.innerHTML = `<div class="sym-${sym}"></div>`;
             p.el.appendChild(div);
         });
@@ -496,11 +496,11 @@
         p.el.style.top = p.y + 'px';
     }
 
-    function getCoords(type, rot) {
-        let pts = (type === 'pair') 
-            ? [{r:0,c:0}, {r:1,c:0}] 
+    function getCoords(size, rot) {
+        let pts = (size === 2)
+            ? [{r:0,c:0}, {r:1,c:0}]
             : [{r:0,c:0}, {r:1,c:0}, {r:1,c:1}];
-        
+
         for(let i=0; i<rot; i++) {
             pts = pts.map(p => ({r: p.c, c: -p.r}));
         }
@@ -521,13 +521,13 @@
 
             dragging = false;
             startTime = Date.now();
-            
+
             const touch = e.touches ? e.touches[0] : e;
             startX = touch.clientX;
             startY = touch.clientY;
             startLeft = p.x;
             startTop = p.y;
-            
+
             p.el.classList.add('dragging');
 
             document.addEventListener('mousemove', onMove);
@@ -562,7 +562,7 @@
             document.removeEventListener('mouseup', onUp);
             document.removeEventListener('touchmove', onMove);
             document.removeEventListener('touchend', onUp);
-            
+
             p.el.classList.remove('dragging');
 
             if (!dragging && (Date.now() - startTime < 300)) {
@@ -592,7 +592,7 @@
         const cy = p.y + h / 2;
 
         p.el.style.transition = 'transform 0.2s ease-out';
-        p.el.style.transform = 'rotate(90deg) scale(1.1)'; 
+        p.el.style.transform = 'rotate(90deg) scale(1.1)';
 
         setTimeout(() => {
             p.rot = (p.rot + 1) % 4;
@@ -607,8 +607,8 @@
             p.el.style.left = p.x + 'px';
             p.el.style.top = p.y + 'px';
 
-            void p.el.offsetWidth; 
-            p.el.style.transition = ''; 
+            void p.el.offsetWidth;
+            p.el.style.transition = '';
             p.isAnimating = false;
         }, 200);
     }
@@ -617,21 +617,21 @@
         const board = document.getElementById('board');
         const bRect = board.getBoundingClientRect();
         const pRect = p.el.getBoundingClientRect();
-        
+
         const pCenterX = pRect.left + pRect.width / 2;
         const pCenterY = pRect.top + pRect.height / 2;
 
-        if (pCenterX > bRect.left && pCenterX < bRect.right && 
+        if (pCenterX > bRect.left && pCenterX < bRect.right &&
             pCenterY > bRect.top && pCenterY < bRect.bottom) {
-            
+
             const relX = pRect.left - (bRect.left + BORDER);
             const relY = pRect.top - (bRect.top + BORDER);
             const step = cell_size + GAP;
-            
+
             // 1. Primary Snap
             const centerC = Math.round(relX / step);
             const centerR = Math.round(relY / step);
-            
+
             if (isValid(p, centerR, centerC)) {
                 snapTo(p, centerR, centerC);
                 return;
@@ -698,7 +698,7 @@
     }
 
     function isValid(p, r, c) {
-        const coords = getCoords(p.def.type, p.rot);
+        const coords = getCoords(p.def.length, p.rot);
         for (let i=0; i<coords.length; i++) {
             const pt = coords[i];
             const tr = r + pt.r;
@@ -706,13 +706,13 @@
 
             if (tr < 0 || tr >= 7 || tc < 0 || tc >= 4) return false;
             if (piecesState.some(o => o !== p && o.placed && checkOverlap(o, tr, tc))) return false;
-            if (BOARD_LAYOUT[tr][tc] !== p.def.syms[i]) return false;
+            if (BOARD_LAYOUT[tr][tc] !== p.def[i]) return false;
         }
         return true;
     }
 
     function checkOverlap(other, tr, tc) {
-        const coords = getCoords(other.def.type, other.rot);
+        const coords = getCoords(other.def.length, other.rot);
         return coords.some(pt => (other.gridPos.r + pt.r) === tr && (other.gridPos.c + pt.c) === tc);
     }
 
