@@ -35,4 +35,4 @@ The objective of Gridlock is to fit a specific set of puzzle pieces onto a 7x4 g
     * **Role of Gemini:** Acting as the coding engine, Gemini generated the complete source code, implemented the game logic (collision detection, state management), designed the CSS visual style (including the bevelled tile look), and refined the UX based on user feedback.
 
 ## Running the Game
-Simply open `gridlock.html` in any modern web browser. No installation or server is required.
+Simply open [gridlock.html](https://rthellend.github.io/gridlock/gridlock.html) in any modern web browser. No installation or server is required.
